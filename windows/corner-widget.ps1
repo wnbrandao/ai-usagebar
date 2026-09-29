@@ -7,7 +7,10 @@ Add-Type -AssemblyName PresentationCore
 Add-Type -AssemblyName WindowsBase
 
 $mutex = [System.Threading.Mutex]::new($false, 'Local\AIUsageBarCornerWidget')
-if (-not $mutex.WaitOne(0)) { exit }
+if (-not $mutex.WaitOne(0)) {
+    if ($SmokeTest) { throw 'Another corner widget instance prevented the smoke test.' }
+    exit
+}
 
 $settingsDir = Join-Path $env:LOCALAPPDATA 'ai-usagebar'
 $settingsFile = Join-Path $settingsDir 'corner-widget.json'
@@ -106,6 +109,9 @@ function Set-Ring([double]$percent, [string]$severity) {
 
 function Draw-Report {
     $entry = @($script:entries | Where-Object { $_.id -eq $script:selected } | Select-Object -First 1)
+    if (-not $entry.Count) {
+        $entry = @($script:entries | Where-Object { $_.metrics -and @($_.metrics).Count -gt 0 } | Select-Object -First 1)
+    }
     if (-not $entry.Count) { $entry = @($script:entries | Select-Object -First 1) }
     $metric = @($entry[0].metrics | Where-Object { -not $_.group } | Select-Object -First 1)
     if (-not $metric.Count) { $metric = @($entry[0].metrics | Select-Object -First 1) }
@@ -223,12 +229,15 @@ $timer.Start()
 $window.Add_ContentRendered({ Refresh-Report })
 $window.Add_Closed({ $timer.Stop(); $mutex.ReleaseMutex(); $mutex.Dispose() })
 if ($SmokeTest) {
-    $script:entries = @([pscustomobject]@{
-        id='openai'; name='Codex'; display_name='Codex'; error=$null
-        metrics=@([pscustomobject]@{
-            label='Weekly'; value='37% used'; percent=37; severity='green'; group=$null
-        })
-    })
+    $script:entries = @(
+        [pscustomobject]@{ id='anthropic'; name='Claude'; display_name='Claude'; error='Not signed in'; metrics=@() }
+        [pscustomobject]@{
+            id='openai'; name='Codex'; display_name='Codex'; error=$null
+            metrics=@([pscustomobject]@{
+                label='Weekly'; value='37% used'; percent=37; severity='green'; group=$null
+            })
+        }
+    )
     Draw-Report
     if ($compactText.Text -ne '37%') { throw 'The compact meter did not render the report.' }
     Set-Expanded $true
