@@ -13,7 +13,7 @@ use tao::event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy};
 use tao::monitor::MonitorHandle;
 use tao::platform::windows::{MonitorHandleExtWindows, WindowBuilderExtWindows, WindowExtWindows};
 use tao::window::{Window, WindowBuilder};
-use tray_icon::menu::{ContextMenu, Menu, MenuEvent};
+use tray_icon::menu::{ContextMenu, Menu, MenuEvent, MenuItem};
 use tray_icon::{
     Icon, MouseButton, MouseButtonState, Rect, TrayIcon, TrayIconBuilder, TrayIconEvent,
 };
@@ -44,7 +44,9 @@ use super::payload::{
 use super::placement::{self, Area, Insets};
 use super::style::PopoverStyle;
 use super::updates::Updates;
-use super::{RELAUNCH_ENV, now_ms, profile, startup, taskbar_theme, tui_launch, update_flow};
+use super::{
+    RELAUNCH_ENV, corner_widget, now_ms, profile, startup, taskbar_theme, tui_launch, update_flow,
+};
 use crate::config::{Config, UpdateMode};
 use crate::update::{current_os, sweep_old};
 
@@ -280,6 +282,7 @@ fn run_loop() -> Result<(), String> {
         &context_menu,
         &options_menu::options_entries(&OptionsLabels::default(), false, startup::is_enabled()),
     );
+    append_corner_widget(&context_menu);
     let ink = taskbar_theme::ink();
     let tray = build_tray(&empty, ink)?;
     {
@@ -725,6 +728,7 @@ fn handle_tray(state: &mut TrayState, event: TrayIconEvent) {
                     startup::is_enabled(),
                 ),
             );
+            append_corner_widget(&state.context_menu);
             let hwnd = state.tray.window_handle() as isize;
             // SAFETY: hwnd is the tray message window, valid while `tray` lives.
             // None uses the cursor, which is still over the NotifyIcon.
@@ -737,6 +741,10 @@ fn handle_tray(state: &mut TrayState, event: TrayIconEvent) {
 }
 
 fn handle_menu(state: &mut TrayState, event: &MenuEvent, control_flow: &mut ControlFlow) {
+    if event.id.as_ref() == "corner-widget-open" {
+        let _ = corner_widget::open();
+        return;
+    }
     let Some(action) = OptionsAction::from_id(event.id.as_ref()) else {
         return;
     };
@@ -755,6 +763,15 @@ fn handle_menu(state: &mut TrayState, event: &MenuEvent, control_flow: &mut Cont
         | OptionsAction::CheckUpdates
         | OptionsAction::About => open_popover_action(state, action),
     }
+}
+
+fn append_corner_widget(menu: &Menu) {
+    let _ = menu.append(&MenuItem::with_id(
+        "corner-widget-open",
+        "Open Corner Widget",
+        true,
+        None,
+    ));
 }
 
 fn handle_ipc(state: &mut TrayState, body: &str, control_flow: &mut ControlFlow) {

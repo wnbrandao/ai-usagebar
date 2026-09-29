@@ -211,3 +211,7 @@ jobs:
 
       - name: Test Windows popover model
         run: node windows/popover/popover.test.mjs
+
+      - name: Smoke-test Windows corner widget
+        shell: pwsh
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -STA -File windows/corner-widget.ps1 -UsageExe unused -SmokeTest
