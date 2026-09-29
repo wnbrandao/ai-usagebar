@@ -16,9 +16,9 @@ mod payload;
 mod strip;
 
 #[cfg(windows)]
-mod host;
-#[cfg(windows)]
 mod corner_widget;
+#[cfg(windows)]
+mod host;
 #[cfg(target_os = "macos")]
 mod host_macos;
 #[cfg(windows)]
