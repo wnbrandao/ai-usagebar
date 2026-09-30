@@ -35,8 +35,7 @@ pub(super) fn save_display(value: &Value) -> Result<(), String> {
         _ => "used",
     };
     let data = json!({"visible": visible, "theme": theme, "showAs": show_as});
-    std::fs::write(widget_dir()?.join("display.json"), data.to_string())
-        .map_err(|e| e.to_string())
+    std::fs::write(widget_dir()?.join("display.json"), data.to_string()).map_err(|e| e.to_string())
 }
 
 pub(super) fn open() -> Result<(), String> {
