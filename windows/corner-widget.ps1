@@ -98,6 +98,7 @@ $script:entries = @()
 $script:display = $null
 $script:displayRaw = ''
 $script:theme = 'light'
+$script:showAs = 'used'
 $script:selected = if ($saved) { [string]$saved.provider } else { '' }
 $script:expanded = $false
 $script:anchorX = $window.Left
@@ -138,9 +139,9 @@ function Apply-Theme {
 
 function Severity-Brush([string]$severity) {
     $colors = if ($script:theme -eq 'dark') {
-        @{ green='#30d158'; yellow='#ffd60a'; orange='#ff9f0a'; red='#ff453a' }
+        @{ low='#60cdff'; mid='#ffd60a'; high='#ffd60a'; critical='#ff453a' }
     } else {
-        @{ green='#34c759'; yellow='#ffcc00'; orange='#ff9500'; red='#ff3b30' }
+        @{ low='#005fb8'; mid='#ffcc00'; high='#ffcc00'; critical='#ff3b30' }
     }
     $color = if ($colors.ContainsKey($severity)) { $colors[$severity] } else {
         if ($script:theme -eq 'dark') { '#60cdff' } else { '#005fb8' }
@@ -179,8 +180,9 @@ function Draw-Report {
     $metric = @($entry[0].metrics | Where-Object { -not $_.group } | Select-Object -First 1)
     if (-not $metric.Count) { $metric = @($entry[0].metrics | Select-Object -First 1) }
     $percent = if ($metric.Count) { [double]$metric[0].percent } else { 0 }
-    Set-Ring $percent ([string]$metric[0].severity)
-    $compactText.Text = if ($metric.Count) { '{0:0}%' -f $percent } else { '—' }
+    $shownPercent = if ($script:showAs -eq 'left') { 100 - $percent } else { $percent }
+    Set-Ring $shownPercent ([string]$metric[0].severity)
+    $compactText.Text = if ($metric.Count) { '{0:0}%' -f $shownPercent } else { '—' }
     $tabs.Children.Clear()
     $rows.Children.Clear()
     $dark = $script:theme -eq 'dark'
@@ -232,10 +234,14 @@ function Draw-Report {
         $rows.Children.Add($message) | Out-Null
     }
     foreach ($m in $metrics) {
+        $usedPercent = [Math]::Max(0, [Math]::Min(100, [double]$m.percent))
+        $meterPercent = if ($script:showAs -eq 'left') { 100 - $usedPercent } else { $usedPercent }
         $line = New-Object System.Windows.Controls.DockPanel
         $line.Margin = '0,2,0,4'
         $value = New-Object System.Windows.Controls.TextBlock
-        $value.Text = [string]$m.value
+        $value.Text = if ($m.headline -eq 'percent') {
+            '{0:0}% {1}' -f $meterPercent, $script:showAs
+        } else { [string]$m.value }
         $value.Foreground = $foreground
         $value.FontSize = 11
         [System.Windows.Controls.DockPanel]::SetDock($value, 'Right')
@@ -254,7 +260,7 @@ function Draw-Report {
         $track.CornerRadius = 3
         $bar.Children.Add($track) | Out-Null
         $fill = New-Object System.Windows.Controls.Border
-        $fill.Width = 256 * [Math]::Max(0, [Math]::Min(100, [double]$m.percent)) / 100
+        $fill.Width = 256 * $meterPercent / 100
         $fill.HorizontalAlignment = 'Left'
         $fill.Background = Severity-Brush ([string]$m.severity)
         $fill.CornerRadius = 3
@@ -281,6 +287,7 @@ function Apply-Display {
         }
     }
     $script:theme = if ($script:display -and $script:display.theme -eq 'dark') { 'dark' } else { 'light' }
+    $script:showAs = if ($script:display -and $script:display.showAs -eq 'left') { 'left' } else { 'used' }
     Apply-Theme
     Draw-Report
     if ($providerMenu) {
@@ -385,14 +392,14 @@ if ($SmokeTest) {
         [pscustomobject]@{
             id='openai'; name='Codex'; display_name='Codex'; error=$null
             metrics=@([pscustomobject]@{
-                label='Weekly'; value='37% used'; percent=37; severity='green'; group=$null
+                label='Weekly'; value='37% used'; percent=37; severity='high'; headline='percent'; group=$null
             })
         }
     )
-    $script:display = [pscustomobject]@{ visible=@('openai'); theme='dark' }
+    $script:display = [pscustomobject]@{ visible=@('openai'); theme='dark'; showAs='left' }
     Apply-Display
     if ($script:entries.Count -ne 1 -or $script:entries[0].id -ne 'openai') { throw 'Inactive providers were shown.' }
-    if ($compactText.Text -ne '37%') { throw 'The compact meter did not render the report.' }
+    if ($compactText.Text -ne '63%') { throw 'The compact meter did not follow Show Usage As.' }
     Set-Expanded $true
     if ($panel.Visibility -ne 'Visible') { throw 'The details panel did not expand.' }
     if ($ScreenshotPath) {
