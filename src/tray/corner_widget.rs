@@ -5,12 +5,42 @@ use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
+use serde_json::{Value, json};
+
 const SCRIPT: &str = include_str!("../../windows/corner-widget.ps1");
 
-pub(super) fn open() -> Result<(), String> {
+fn widget_dir() -> Result<PathBuf, String> {
     let local = std::env::var_os("LOCALAPPDATA").ok_or("LOCALAPPDATA is unset")?;
     let dir = PathBuf::from(local).join("ai-usagebar").join("widget");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+
+pub(super) fn save_display(value: &Value) -> Result<(), String> {
+    let visible: Vec<&str> = value
+        .get("visible")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .filter(|id| !id.is_empty() && id.len() <= 128 && !id.chars().any(char::is_control))
+        .take(100)
+        .collect();
+    let theme = match value.get("theme").and_then(Value::as_str) {
+        Some("dark") => "dark",
+        _ => "light",
+    };
+    let show_as = match value.get("showAs").and_then(Value::as_str) {
+        Some("left") => "left",
+        _ => "used",
+    };
+    let data = json!({"visible": visible, "theme": theme, "showAs": show_as});
+    std::fs::write(widget_dir()?.join("display.json"), data.to_string())
+        .map_err(|e| e.to_string())
+}
+
+pub(super) fn open() -> Result<(), String> {
+    let dir = widget_dir()?;
     let script = dir.join("corner-widget.ps1");
     // Replacing our own bundled script on every launch also upgrades a widget
     // left over from an older tray release.

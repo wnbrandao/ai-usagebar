@@ -801,6 +801,9 @@ fn handle_ipc(state: &mut TrayState, body: &str, control_flow: &mut ControlFlow)
         "quit" => *control_flow = ControlFlow::Exit,
         "toggle-startup" => toggle_startup(state),
         "menu-labels" => state.menu_labels = state.menu_labels.merged(&value),
+        "widget-display" => {
+            let _ = corner_widget::save_display(&value);
+        }
         "resize" => handle_resize(state, &value),
         "set-shortcut" => {
             let text = value.get("value").and_then(Value::as_str).unwrap_or("");
