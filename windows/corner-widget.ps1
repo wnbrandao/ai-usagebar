@@ -63,19 +63,19 @@ $panel.BorderThickness = 1
 $panel.CornerRadius = 8
 $panel.Visibility = 'Collapsed'
 $panelGrid = New-Object System.Windows.Controls.DockPanel
-$panelGrid.Margin = 20
+$panelGrid.Margin = 16
 $panel.Child = $panelGrid
 $header = New-Object System.Windows.Controls.StackPanel
-$header.Margin = '0,0,0,14'
+$header.Margin = '0,0,0,12'
 [System.Windows.Controls.DockPanel]::SetDock($header, 'Top')
 $panelGrid.Children.Add($header) | Out-Null
 $title = New-Object System.Windows.Controls.TextBlock
 $title.Text = 'AI Usage'
 $title.Foreground = [System.Windows.Media.Brushes]::Black
-$title.FontFamily = 'Segoe UI'; $title.FontSize = 18; $title.FontWeight = 'Bold'
+$title.FontFamily = 'Segoe UI'; $title.FontSize = 17; $title.FontWeight = 'SemiBold'
 $header.Children.Add($title) | Out-Null
 $subtitle = New-Object System.Windows.Controls.TextBlock
-$subtitle.Text = 'Usage and balance'
+$subtitle.Text = 'Consumo em tempo real'
 $subtitle.FontSize = 10
 $header.Children.Add($subtitle) | Out-Null
 $tabs = New-Object System.Windows.Controls.StackPanel
@@ -93,7 +93,7 @@ $rows = New-Object System.Windows.Controls.StackPanel
 $card = New-Object System.Windows.Controls.Border
 $card.CornerRadius = 8
 $card.BorderThickness = 1
-$card.Padding = 12
+$card.Padding = 14
 $card.VerticalAlignment = 'Top'
 $card.Child = $rows
 $scroll.Content = $card
@@ -122,27 +122,15 @@ function Color-Brush([string]$color) {
 
 function Apply-Theme {
     $dark = $script:theme -eq 'dark'
-    $gradient = New-Object System.Windows.Media.LinearGradientBrush
-    $gradient.StartPoint = [System.Windows.Point]::new(0, 0)
-    $gradient.EndPoint = [System.Windows.Point]::new(0, 1)
-    foreach ($stop in @(
-        @{ offset=0.0; color=$(if ($dark) { '#007e96' } else { '#62cce0' }) }
-        @{ offset=1.0; color=$(if ($dark) { '#a8664b' } else { '#f9c6ad' }) }
-    )) {
-        $part = New-Object System.Windows.Media.GradientStop
-        $part.Offset = $stop.offset
-        $part.Color = [System.Windows.Media.ColorConverter]::ConvertFromString($stop.color)
-        $gradient.GradientStops.Add($part)
-    }
-    $panel.Background = $gradient
-    $panel.BorderBrush = Color-Brush $(if ($dark) { '#33000000' } else { '#24000000' })
-    $card.Background = Color-Brush $(if ($dark) { '#553a3a3a' } else { '#9cffffff' })
-    $card.BorderBrush = Color-Brush $(if ($dark) { '#29000000' } else { '#18000000' })
-    $ringBackground.Fill = Color-Brush $(if ($dark) { '#1e1e1e' } else { '#ffffff' })
-    $ringBackground.Stroke = Color-Brush $(if ($dark) { '#444444' } else { '#d5d5d5' })
-    $compactText.Foreground = Color-Brush $(if ($dark) { '#ffffff' } else { '#202020' })
-    $title.Foreground = Color-Brush $(if ($dark) { '#ffffff' } else { '#202020' })
-    $subtitle.Foreground = Color-Brush $(if ($dark) { '#c5ffffff' } else { '#9e000000' })
+    $panel.Background = Color-Brush $(if ($dark) { '#15171b' } else { '#f7f7f5' })
+    $panel.BorderBrush = Color-Brush $(if ($dark) { '#34363c' } else { '#d6d8d6' })
+    $card.Background = Color-Brush $(if ($dark) { '#202227' } else { '#ffffff' })
+    $card.BorderBrush = Color-Brush $(if ($dark) { '#34363c' } else { '#e2e3e0' })
+    $ringBackground.Fill = Color-Brush $(if ($dark) { '#15171b' } else { '#ffffff' })
+    $ringBackground.Stroke = Color-Brush $(if ($dark) { '#34363c' } else { '#d6d8d6' })
+    $compactText.Foreground = Color-Brush $(if ($dark) { '#f5f5f2' } else { '#242529' })
+    $title.Foreground = Color-Brush $(if ($dark) { '#f5f5f2' } else { '#242529' })
+    $subtitle.Foreground = Color-Brush $(if ($dark) { '#92969e' } else { '#6a6d72' })
 }
 
 function Severity-Brush([string]$severity) {
@@ -175,6 +163,17 @@ function Set-Ring([double]$percent, [string]$severity) {
     $ring.Data = $geometry
 }
 
+function Format-Reset([string]$timestamp) {
+    if (-not $timestamp) { return '—' }
+    try {
+        $remaining = [DateTimeOffset]::Parse($timestamp) - [DateTimeOffset]::UtcNow
+        if ($remaining.TotalSeconds -le 0) { return 'Agora' }
+        if ($remaining.TotalDays -ge 1) { return ('{0}d {1}h' -f [int][Math]::Floor($remaining.TotalDays), $remaining.Hours) }
+        if ($remaining.TotalHours -ge 1) { return ('{0}h {1}min' -f [int][Math]::Floor($remaining.TotalHours), $remaining.Minutes) }
+        return ('{0}min' -f [Math]::Max(1, [int][Math]::Ceiling($remaining.TotalMinutes)))
+    } catch { return '—' }
+}
+
 function Draw-Report {
     $entry = @($script:entries | Where-Object { $_.id -eq $script:selected } | Select-Object -First 1)
     if (-not $entry.Count) {
@@ -195,8 +194,8 @@ function Draw-Report {
     $tabs.Children.Clear()
     $rows.Children.Clear()
     $dark = $script:theme -eq 'dark'
-    $foreground = Color-Brush $(if ($dark) { '#ffffff' } else { '#202020' })
-    $secondary = Color-Brush $(if ($dark) { '#c5ffffff' } else { '#9e000000' })
+    $foreground = Color-Brush $(if ($dark) { '#f5f5f2' } else { '#242529' })
+    $secondary = Color-Brush $(if ($dark) { '#92969e' } else { '#6a6d72' })
     foreach ($item in $script:entries) {
         $tab = New-Object System.Windows.Controls.Border
         $tab.Tag = [string]$item.id
@@ -204,7 +203,7 @@ function Draw-Report {
         $tab.Margin = '0,0,4,0'
         $tab.CornerRadius = 4
         $tab.Background = Color-Brush $(if ($item.id -eq $script:selected) {
-            if ($dark) { '#44ffffff' } else { '#88ffffff' }
+            if ($dark) { '#34363c' } else { '#e8e9e6' }
         } else { '#00ffffff' })
         $label = New-Object System.Windows.Controls.TextBlock
         $label.Text = if ($item.short_name) { [string]$item.short_name } else { [string]$item.name }
@@ -232,7 +231,7 @@ function Draw-Report {
     $heading.Text = if ($item.display_name) { [string]$item.display_name } else { [string]$item.name }
     $heading.Foreground = $foreground
     $heading.FontWeight = 'SemiBold'; $heading.FontSize = 13
-    $heading.Margin = '0,0,0,10'
+    $heading.Margin = '0,0,0,12'
     $rows.Children.Add($heading) | Out-Null
     $metrics = @($item.metrics)
     if (-not $metrics.Count) {
@@ -265,7 +264,7 @@ function Draw-Report {
         $bar.Width = 256; $bar.Height = 6; $bar.Margin = '0,0,0,4'
         $bar.HorizontalAlignment = 'Left'
         $track = New-Object System.Windows.Controls.Border
-        $track.Background = Color-Brush $(if ($dark) { '#33000000' } else { '#22000000' })
+        $track.Background = Color-Brush $(if ($dark) { '#34363c' } else { '#e8e9e6' })
         $track.CornerRadius = 3
         $bar.Children.Add($track) | Out-Null
         $fill = New-Object System.Windows.Controls.Border
@@ -275,7 +274,7 @@ function Draw-Report {
         $fill.CornerRadius = 3
         $bar.Children.Add($fill) | Out-Null
         $rows.Children.Add($bar) | Out-Null
-        if ($m.detail) {
+        if ($m.detail -and -not $m.reset_at) {
             $detail = New-Object System.Windows.Controls.TextBlock
             $detail.Text = [string]$m.detail
             $detail.Foreground = $secondary
@@ -284,6 +283,38 @@ function Draw-Report {
             $detail.Margin = '0,0,0,10'
             $rows.Children.Add($detail) | Out-Null
         }
+    }
+    $weekly = @($metrics | Where-Object { $_.window_secs -ge 604800 -or $_.label -match 'weekly|semanal' } | Select-Object -First 1)
+    $credits = $item.reset_credits
+    if ($weekly.Count -or $null -ne $credits) {
+        $stats = New-Object System.Windows.Controls.Grid
+        $stats.Margin = '0,12,0,0'
+        $stats.ColumnDefinitions.Add((New-Object System.Windows.Controls.ColumnDefinition))
+        $stats.ColumnDefinitions.Add((New-Object System.Windows.Controls.ColumnDefinition))
+        $index = 0
+        foreach ($stat in @(
+            @{ label='PRÓXIMO RESET'; value=$(if ($weekly.Count) { Format-Reset ([string]$weekly[0].reset_at) } else { '—' }) },
+            @{ label='RESETS DISPONÍVEIS'; value=$(if ($null -ne $credits -and $null -ne $credits.available) { [string]$credits.available } else { '—' }) }
+        )) {
+            $box = New-Object System.Windows.Controls.Border
+            $box.Background = Color-Brush $(if ($dark) { '#292b30' } else { '#f4f5f2' })
+            $box.CornerRadius = 6
+            $box.Padding = '10,8,10,8'
+            if ($index -eq 0) { $box.Margin = '0,0,5,0' } else { $box.Margin = '5,0,0,0' }
+            [System.Windows.Controls.Grid]::SetColumn($box, $index)
+            $content = New-Object System.Windows.Controls.StackPanel
+            $caption = New-Object System.Windows.Controls.TextBlock
+            $caption.Text = $stat.label; $caption.FontSize = 9; $caption.FontWeight = 'SemiBold'; $caption.Foreground = $secondary
+            $number = New-Object System.Windows.Controls.TextBlock
+            $number.Text = $stat.value; $number.FontSize = 16; $number.FontWeight = 'SemiBold'; $number.Foreground = $foreground
+            $number.Margin = '0,3,0,0'
+            $content.Children.Add($caption) | Out-Null
+            $content.Children.Add($number) | Out-Null
+            $box.Child = $content
+            $stats.Children.Add($box) | Out-Null
+            $index++
+        }
+        $rows.Children.Add($stats) | Out-Null
     }
 }
 
@@ -300,7 +331,7 @@ function Apply-Display {
     Apply-Theme
     Draw-Report
     if ($script:expanded) {
-        $window.Height = if ($script:entries.Count -gt 1) { 260 } else { 200 }
+        $window.Height = if ($script:entries.Count -gt 1) { 280 } else { 240 }
         $window.Top = [Math]::Max([System.Windows.SystemParameters]::VirtualScreenTop, [Math]::Min($script:anchorY, [System.Windows.SystemParameters]::VirtualScreenTop + [System.Windows.SystemParameters]::VirtualScreenHeight - $window.Height))
     }
     if ($providerMenu) {
@@ -335,7 +366,7 @@ function Set-Expanded([bool]$open) {
     $script:expanded = $open
     if ($open) {
         $circle.Visibility = 'Collapsed'; $panel.Visibility = 'Visible'
-        $height = if ($script:entries.Count -gt 1) { 260 } else { 200 }
+        $height = if ($script:entries.Count -gt 1) { 280 } else { 240 }
         $window.Width = 320; $window.Height = $height
         $window.Left = [Math]::Max([System.Windows.SystemParameters]::VirtualScreenLeft, [Math]::Min($script:anchorX, [System.Windows.SystemParameters]::VirtualScreenLeft + [System.Windows.SystemParameters]::VirtualScreenWidth - 320))
         $window.Top = [Math]::Max([System.Windows.SystemParameters]::VirtualScreenTop, [Math]::Min($script:anchorY, [System.Windows.SystemParameters]::VirtualScreenTop + [System.Windows.SystemParameters]::VirtualScreenHeight - $height))
@@ -406,14 +437,17 @@ if ($SmokeTest) {
         [pscustomobject]@{
             id='openai'; name='Codex'; display_name='Codex'; error=$null
             metrics=@([pscustomobject]@{
-                label='Weekly'; value='37% used'; percent=37; severity='high'; headline='percent'; group=$null
+                label='Codex weekly'; value='37% used'; percent=37; severity='high'; headline='percent'; group=$null
+                window_secs=604800; reset_at=([DateTimeOffset]::UtcNow.AddDays(3).AddHours(17).ToString('o'))
             })
+            reset_credits=[pscustomobject]@{ available=2 }
         }
     )
     $script:display = [pscustomobject]@{ visible=@('openai'); theme='dark'; showAs='left' }
     Apply-Display
     if ($script:entries.Count -ne 1 -or $script:entries[0].id -ne 'openai') { throw 'Inactive providers were shown.' }
     if ($compactText.Text -ne '63%') { throw 'The compact meter did not follow Show Usage As.' }
+    if (-not (@($rows.Children | Where-Object { $_ -is [System.Windows.Controls.Grid] }).Count)) { throw 'Weekly reset details were not shown.' }
     Set-Expanded $true
     if ($panel.Visibility -ne 'Visible') { throw 'The details panel did not expand.' }
     if ($ScreenshotPath) {
