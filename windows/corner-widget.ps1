@@ -133,20 +133,13 @@ function Apply-Theme {
     $subtitle.Foreground = Color-Brush $(if ($dark) { '#92969e' } else { '#6a6d72' })
 }
 
-function Severity-Brush([string]$severity) {
-    $colors = if ($script:theme -eq 'dark') {
-        @{ low='#60cdff'; mid='#ffd60a'; high='#ffd60a'; critical='#ff453a' }
-    } else {
-        @{ low='#005fb8'; mid='#ffcc00'; high='#ffcc00'; critical='#ff3b30' }
-    }
-    $color = if ($colors.ContainsKey($severity)) { $colors[$severity] } else {
-        if ($script:theme -eq 'dark') { '#60cdff' } else { '#005fb8' }
-    }
-    Color-Brush $color
+function Progress-Brush([double]$percent) {
+    if ($percent -gt 80 -or $percent -lt 20) { return Color-Brush '#ff5f57' }
+    Color-Brush $(if ($script:theme -eq 'dark') { '#f5f5f2' } else { '#242529' })
 }
 
-function Set-Ring([double]$percent, [string]$severity) {
-    $ring.Stroke = Severity-Brush $severity
+function Set-Ring([double]$percent) {
+    $ring.Stroke = Progress-Brush $percent
     $percent = [Math]::Max(0, [Math]::Min(100, $percent))
     $angle = 2 * [Math]::PI * [Math]::Min(99.99, $percent) / 100
     $start = [System.Windows.Point]::new(36, 8)
@@ -188,8 +181,9 @@ function Draw-Report {
     if (-not $metric.Count) { $metric = @($entry[0].metrics | Select-Object -First 1) }
     $percent = if ($metric.Count) { [double]$metric[0].percent } else { 0 }
     $shownPercent = if ($script:showAs -eq 'left') { 100 - $percent } else { $percent }
-    Set-Ring $shownPercent ([string]$metric[0].severity)
+    Set-Ring $shownPercent
     $compactText.Text = if ($metric.Count) { '{0:0}%' -f $shownPercent } else { '—' }
+    $compactText.Foreground = Progress-Brush $shownPercent
     $tabsScroll.Visibility = if ($script:entries.Count -gt 1) { 'Visible' } else { 'Collapsed' }
     $tabs.Children.Clear()
     $rows.Children.Clear()
@@ -250,7 +244,7 @@ function Draw-Report {
         $value.Text = if ($m.headline -eq 'percent') {
             '{0:0}% {1}' -f $meterPercent, $script:showAs
         } else { [string]$m.value }
-        $value.Foreground = $foreground
+        $value.Foreground = Progress-Brush $meterPercent
         $value.FontSize = 11
         [System.Windows.Controls.DockPanel]::SetDock($value, 'Right')
         $line.Children.Add($value) | Out-Null
@@ -270,7 +264,7 @@ function Draw-Report {
         $fill = New-Object System.Windows.Controls.Border
         $fill.Width = 256 * $meterPercent / 100
         $fill.HorizontalAlignment = 'Left'
-        $fill.Background = Severity-Brush ([string]$m.severity)
+        $fill.Background = Progress-Brush $meterPercent
         $fill.CornerRadius = 3
         $bar.Children.Add($fill) | Out-Null
         $rows.Children.Add($bar) | Out-Null
@@ -447,6 +441,14 @@ if ($SmokeTest) {
     Apply-Display
     if ($script:entries.Count -ne 1 -or $script:entries[0].id -ne 'openai') { throw 'Inactive providers were shown.' }
     if ($compactText.Text -ne '63%') { throw 'The compact meter did not follow Show Usage As.' }
+    if ($ring.Stroke.ToString() -ne '#FFF5F5F2') { throw 'Normal progress is not white.' }
+    foreach ($criticalPercent in @(19, 81)) {
+        $script:allEntries[1].metrics[0].percent = 100 - $criticalPercent
+        Apply-Display
+        if ($ring.Stroke.ToString() -ne '#FFFF5F57') { throw "Progress at $criticalPercent% is not red." }
+    }
+    $script:allEntries[1].metrics[0].percent = 37
+    Apply-Display
     if (-not (@($rows.Children | Where-Object { $_ -is [System.Windows.Controls.Grid] }).Count)) { throw 'Weekly reset details were not shown.' }
     Set-Expanded $true
     if ($panel.Visibility -ne 'Visible') { throw 'The details panel did not expand.' }
