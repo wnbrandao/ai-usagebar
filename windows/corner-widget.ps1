@@ -1,6 +1,8 @@
-param([Parameter(Mandatory=$true)][string]$UsageExe, [switch]$SmokeTest, [string]$ScreenshotPath)
+﻿param([Parameter(Mandatory=$true)][string]$UsageExe, [switch]$SmokeTest, [string]$ScreenshotPath)
 
 $ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = [Console]::OutputEncoding
 
 Add-Type -AssemblyName PresentationFramework
 Add-Type -AssemblyName PresentationCore
@@ -63,14 +65,19 @@ $panel.Visibility = 'Collapsed'
 $panelGrid = New-Object System.Windows.Controls.DockPanel
 $panelGrid.Margin = 20
 $panel.Child = $panelGrid
+$header = New-Object System.Windows.Controls.StackPanel
+$header.Margin = '0,0,0,14'
+[System.Windows.Controls.DockPanel]::SetDock($header, 'Top')
+$panelGrid.Children.Add($header) | Out-Null
 $title = New-Object System.Windows.Controls.TextBlock
 $title.Text = 'AI Usage'
 $title.Foreground = [System.Windows.Media.Brushes]::Black
-$title.FontFamily = 'Segoe UI'; $title.FontSize = 13; $title.FontWeight = 'SemiBold'
-$title.HorizontalAlignment = 'Center'
-$title.Margin = '0,0,0,14'
-[System.Windows.Controls.DockPanel]::SetDock($title, 'Top')
-$panelGrid.Children.Add($title) | Out-Null
+$title.FontFamily = 'Segoe UI'; $title.FontSize = 18; $title.FontWeight = 'Bold'
+$header.Children.Add($title) | Out-Null
+$subtitle = New-Object System.Windows.Controls.TextBlock
+$subtitle.Text = 'Usage and balance'
+$subtitle.FontSize = 10
+$header.Children.Add($subtitle) | Out-Null
 $tabs = New-Object System.Windows.Controls.StackPanel
 $tabs.Orientation = 'Horizontal'
 $tabsScroll = New-Object System.Windows.Controls.ScrollViewer
@@ -135,6 +142,7 @@ function Apply-Theme {
     $ringBackground.Stroke = Color-Brush $(if ($dark) { '#444444' } else { '#d5d5d5' })
     $compactText.Foreground = Color-Brush $(if ($dark) { '#ffffff' } else { '#202020' })
     $title.Foreground = Color-Brush $(if ($dark) { '#ffffff' } else { '#202020' })
+    $subtitle.Foreground = Color-Brush $(if ($dark) { '#c5ffffff' } else { '#9e000000' })
 }
 
 function Severity-Brush([string]$severity) {
@@ -183,6 +191,7 @@ function Draw-Report {
     $shownPercent = if ($script:showAs -eq 'left') { 100 - $percent } else { $percent }
     Set-Ring $shownPercent ([string]$metric[0].severity)
     $compactText.Text = if ($metric.Count) { '{0:0}%' -f $shownPercent } else { '—' }
+    $tabsScroll.Visibility = if ($script:entries.Count -gt 1) { 'Visible' } else { 'Collapsed' }
     $tabs.Children.Clear()
     $rows.Children.Clear()
     $dark = $script:theme -eq 'dark'
@@ -290,6 +299,10 @@ function Apply-Display {
     $script:showAs = if ($script:display -and $script:display.showAs -eq 'left') { 'left' } else { 'used' }
     Apply-Theme
     Draw-Report
+    if ($script:expanded) {
+        $window.Height = if ($script:entries.Count -gt 1) { 260 } else { 200 }
+        $window.Top = [Math]::Max([System.Windows.SystemParameters]::VirtualScreenTop, [Math]::Min($script:anchorY, [System.Windows.SystemParameters]::VirtualScreenTop + [System.Windows.SystemParameters]::VirtualScreenHeight - $window.Height))
+    }
     if ($providerMenu) {
         $providerMenu.Items.Clear()
         foreach ($item in $script:entries) {
@@ -322,9 +335,10 @@ function Set-Expanded([bool]$open) {
     $script:expanded = $open
     if ($open) {
         $circle.Visibility = 'Collapsed'; $panel.Visibility = 'Visible'
-        $window.Width = 320; $window.Height = 320
+        $height = if ($script:entries.Count -gt 1) { 260 } else { 200 }
+        $window.Width = 320; $window.Height = $height
         $window.Left = [Math]::Max([System.Windows.SystemParameters]::VirtualScreenLeft, [Math]::Min($script:anchorX, [System.Windows.SystemParameters]::VirtualScreenLeft + [System.Windows.SystemParameters]::VirtualScreenWidth - 320))
-        $window.Top = [Math]::Max([System.Windows.SystemParameters]::VirtualScreenTop, [Math]::Min($script:anchorY, [System.Windows.SystemParameters]::VirtualScreenTop + [System.Windows.SystemParameters]::VirtualScreenHeight - 320))
+        $window.Top = [Math]::Max([System.Windows.SystemParameters]::VirtualScreenTop, [Math]::Min($script:anchorY, [System.Windows.SystemParameters]::VirtualScreenTop + [System.Windows.SystemParameters]::VirtualScreenHeight - $height))
     } else {
         $panel.Visibility = 'Collapsed'; $circle.Visibility = 'Visible'
         $window.Width = 72; $window.Height = 72
@@ -403,10 +417,10 @@ if ($SmokeTest) {
     Set-Expanded $true
     if ($panel.Visibility -ne 'Visible') { throw 'The details panel did not expand.' }
     if ($ScreenshotPath) {
-        $size = [System.Windows.Size]::new(320, 320)
+        $size = [System.Windows.Size]::new(320, $window.Height)
         $root.Measure($size)
         $root.Arrange([System.Windows.Rect]::new([System.Windows.Point]::new(0, 0), $size))
-        $image = [System.Windows.Media.Imaging.RenderTargetBitmap]::new(320, 320, 96, 96, [System.Windows.Media.PixelFormats]::Pbgra32)
+        $image = [System.Windows.Media.Imaging.RenderTargetBitmap]::new(320, [int]$window.Height, 96, 96, [System.Windows.Media.PixelFormats]::Pbgra32)
         $image.Render($root)
         $encoder = New-Object System.Windows.Media.Imaging.PngBitmapEncoder
         $encoder.Frames.Add([System.Windows.Media.Imaging.BitmapFrame]::Create($image))
