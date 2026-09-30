@@ -86,6 +86,17 @@ export default function App() {
   const visible = useMemo(() => applyCardLayout(cards, layout), [cards, layout]);
   const currentCard = cards.find((card) => card.id === providerId);
 
+  // The floating Windows widget follows the same provider switches, order,
+  // and appearance that Settings uses in this WebView profile.
+  useEffect(() => {
+    if (payload.generatedAt <= 0 && payload.entries.length === 0) return;
+    sendCommand("widget-display", {
+      visible: visible.map((card) => card.id),
+      theme: resolvedTheme(layout.theme),
+      showAs: layout.showAs,
+    });
+  }, [visible, layout.theme, layout.showAs, payload.generatedAt, payload.entries.length]);
+
   function commit(next: Layout) {
     setLayout(next);
     saveLayout(storageRef.current, next);

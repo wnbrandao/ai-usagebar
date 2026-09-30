@@ -211,3 +211,28 @@ jobs:
 
       - name: Test Windows popover model
         run: node windows/popover/popover.test.mjs
+
+      - name: Smoke-test Windows corner widget
+        shell: pwsh
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -STA -File windows/corner-widget.ps1 -UsageExe unused -SmokeTest
+
+      - name: Build Windows preview
+        if: github.event_name == 'workflow_dispatch'
+        run: cargo build --release --locked --bin ai-usagebar --bin ai-usagebar-tray --bin ai-usagebar-tui
+
+      - name: Package Windows preview
+        if: github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        run: |
+          $stage = Join-Path $env:RUNNER_TEMP 'widget-preview'
+          New-Item -ItemType Directory -Path $stage | Out-Null
+          Copy-Item target/release/ai-usagebar.exe, target/release/ai-usagebar-tray.exe, target/release/ai-usagebar-tui.exe $stage
+          Copy-Item windows/README.md (Join-Path $stage 'README-Windows.md')
+          Compress-Archive -Path (Join-Path $stage '*') -DestinationPath windows-corner-widget-preview.zip
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          name: windows-corner-widget-preview
+          path: windows-corner-widget-preview.zip
+          if-no-files-found: error

@@ -1,5 +1,22 @@
 # AI Usage Bar — Windows tray popover
 
+## Corner widget (experimental)
+
+Right-click the AI Usage icon in the notification area and choose **Open Corner
+Widget**. The tray executable includes the widget; Python and a separate
+download are not needed. Windows PowerShell starts its WPF window in the
+background. The compact view is a circular meter for one provider. Hover to
+expand the dashboard, drag it to move it, and right-click the widget to choose
+the provider shown in the circle, refresh, or quit. The widget follows the
+providers enabled in **Settings → Providers**, their order, and the popover's
+light or dark theme. The expanded view shows tabs for those providers and the
+selected provider's details, using the Windows Native palette. Its position
+and selected provider are saved in `%LOCALAPPDATA%\ai-usagebar\corner-widget.json`.
+
+The widget reads `ai-usagebar usage --json` every five minutes, using the
+`ai-usagebar.exe` installed beside the tray executable. It runs independently
+from the tray popover.
+
 A NotifyIcon + WebView2 popover for [`ai-usagebar`](../README.md). Left-click
 the tray icon for a dashboard that follows the OpenUsage (SwiftUI edition)
 design: a compact 300 px panel that sizes itself to its content, provider sections
